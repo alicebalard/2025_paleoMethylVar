@@ -1,7 +1,20 @@
 #!/bin/bash
 
-# Set the working directory
-DIR="/SAN/ghlab/pophistory/Alice/paleo_project/data/01rawfastq/single/TEMP/01Trimmed_data"
+# Usage: ./S01.3_cleanup.sh /path/to/your/working/directory
+
+# Check if a directory argument is provided
+if [[ -z "$1" ]]; then
+    echo "Usage: $0 /path/to/working/directory"
+    exit 1
+fi
+
+DIR="$1"
+
+# Ensure the provided directory exists
+if [[ ! -d "$DIR" ]]; then
+    echo "Error: Directory '$DIR' does not exist."
+    exit 1
+fi
 
 cd "$DIR" || exit 1
 
@@ -26,5 +39,3 @@ for bam in *.filtered.sorted.dedup.bam; do
         rm -f -- "$f"
     done
 done
-
-
