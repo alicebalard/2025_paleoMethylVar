@@ -1,16 +1,13 @@
 #!/bin/bash
-#$ -N prepMarchi
+#$ -N palprep_paired_Marchi
 #$ -S /bin/bash
 #$ -l h_vmem=12G,tmem=12G ## NB: tmem value is per core
-#$ -t 1-866
-#$ -tc 100 # 100 samples max in one go
+#$ -t 1-6
 #$ -pe smp 4 # Request N cores per task 
-#$ -l h_rt=72:00:00
+#$ -l h_rt=24:00:00
 #$ -wd /SAN/ghlab/epigen/Alice/paleo_project/logs # one err and out file per sample
 #$ -R y # reserve the resources, i.e. stop smaller jobs from getting into the queue while you wait for all the required resources to become available for you
 THREADS=4
-
-## done: launch Matchi single (866) + double (12) (total=878) --> 862 ok so miss 16
 
 ##########################################
 ## Download hs37d5 reference and index it:
@@ -30,22 +27,25 @@ export PATH=/share/apps/pigz-2.6/:$PATH
 ## $BWA index reference/hs37d5.fa ## done
 
 DATADIR="/SAN/ghlab/epigen/Alice/paleo_project/data"
-SAMPLEDIR="/SAN/ghlab/epigen/Alice/paleo_project/data/01rawfastq/Marchi2022/single"
+## Samples are in:
+SAMPLEDIR="$DATADIR/01rawfastq/Marchi2022/paired"
 REFERENCE="$DATADIR/reference/hs37d5.fa.gz"
 
-## We make a temporary folder for all intermediate files that we will delete at the end of all analyses.
+## We make a temporary folder for all intermediate files that we delete at the end.
 TEMP_OUTDIR="$SAMPLEDIR/TEMP"
 
 mkdir -p $TEMP_OUTDIR
 cd $TEMP_OUTDIR
 
-# Create the files to loop over if it does not exist (NB: update if paths change!):
-ls -1 $SAMPLEDIR/*fastq.gz > $TEMP_OUTDIR/list_of_files.tmp
+# Create the files to loop over if it does not exist:
+ls -1 $SAMPLEDIR/*_1.fastq.gz > $TEMP_OUTDIR/list_of_files.tmp
 xargs -n1 basename < $TEMP_OUTDIR/list_of_files.tmp | cut -d. -f1 > $TEMP_OUTDIR/list_of_sample_names.tmp
 
 ## Select the correct line of list of files at each iteration
-FASTQ=$(sed -n "${SGE_TASK_ID}p" $TEMP_OUTDIR/list_of_files.tmp)
-SAMPLE_NAME=$(sed -n "${SGE_TASK_ID}p" $TEMP_OUTDIR/list_of_sample_names.tmp)
+FASTQ_1=$(sed -n "${SGE_TASK_ID}p" $TEMP_OUTDIR/list_of_files.tmp)
+FASTQ_2="${FASTQ_1/_1.fastq.gz/_2.fastq.gz}"
+BASENAME="${FASTQ_1##*/}"         # ERR8702979_1.fastq.gz
+SAMPLE_NAME="${BASENAME%%_*}"     # ERR8702979
 
 # Log the start of the job. 
 echo "**** Job $JOB_NAME.$JOB_ID started at $(date) ****"
@@ -59,11 +59,10 @@ if [ ! -f "$DATADIR/02samplesBams/Marchi2022/${SAMPLE_NAME}.filtered.sorted.dedu
     ## Trim raw reads
     ### Single reads: "Raw reads were trimmed using Trim Galore with no quality filter and a length filter of 30 bp (-q0, --length 30, -a ‘AGATCGGAAGAGCACACGTCTGAACTCC’)."
 
-    TRIMMED="$TRIMOM_OUTDIR/${SAMPLE_NAME}_trimmed.fq.gz"
-
     echo "**** Start of step 1: Trim galore with with no quality filter and a length filter of 30 bp $(date) ****" 
     echo "Run Trim Galore command without fastqc"
-    /share/apps/genomics/TrimGalore-0.6.7/trim_galore --path_to_cutadapt /share/apps/genomics/cutadapt-2.5/bin/cutadapt -q 0 --length 30 -a AGATCGGAAGAGCACACGTCTGAACTCC --cores 1 --output_dir $TRIMOM_OUTDIR $FASTQ ## the help advise for 4 cores, but Ed Martin from CS advise that with pigz, 1 core is better on this system. Or we could use bgzip
+    /share/apps/genomics/TrimGalore-0.6.7/trim_galore --path_to_cutadapt /share/apps/genomics/cutadapt-2.5/bin/cutadapt -q 0 --length 30 -a AGATCGGAAGAGCACACGTCTGAACTCC -a2 AGATCGGAAGAGCGTCGTGTAGGGAAAG --paired --cores 1 --output_dir $TRIMOM_OUTDIR $FASTQ_1 $FASTQ_2
+    ## the help advise for 4 cores, but Ed Martin from CS advise that with pigz, 1 core is better on this system. Or we could use bgzip
 
     ## Pooja:
     #for fastq in $(ls *fastq.gz)
@@ -80,21 +79,22 @@ if [ ! -f "$DATADIR/02samplesBams/Marchi2022/${SAMPLE_NAME}.filtered.sorted.dedu
     echo "**** End of step 1: $(date) ****"
 
     ## output:
-    TRIMMED="$TRIMOM_OUTDIR/${SAMPLE_NAME}_trimmed.fq.gz"
+    TRIMMED_1="$TRIMOM_OUTDIR/${SAMPLE_NAME}_1_val_1.fq.gz"
+    TRIMMED_2="$TRIMOM_OUTDIR/${SAMPLE_NAME}_2_val_2.fq.gz"
 
     ################################
     # Ancient DNA-optimized Mapping:
     ## map reads to Homo sapiens genome assembly hs37d5
 
-    OUTPUT_SAM="$TRIMOM_OUTDIR/${SAMPLE_NAME}.sam"
-
     echo "Align sample ${INPUT##*/} to hs37d5..." ## 2 days to run
-    $BWA aln -l 1024 -n 0.01 -o 2 -t $THREADS "$REFERENCE" "$TRIMMED" > "$TRIMMED.sai" ## (long seed, high mismatch tolerance)
+    $BWA aln -l 1024 -n 0.01 -o 2 -t $THREADS "$REFERENCE" "$TRIMMED_1" > "$TRIMMED_1.sai" ## (long seed, high mismatch tolerance)
+    $BWA aln -l 1024 -n 0.01 -o 2 -t $THREADS "$REFERENCE" "$TRIMMED_2" > "$TRIMMED_2.sai" ## (long seed, high mismatch tolerance)
     ## Updated after to see if difference "Improving ancient DNA read mapping against modern reference genomes - BMC Genomics"
     ## Could improve methylation
 
-    echo "Generate alignment file (single ended):"
-    $BWA samse "$REFERENCE" "$TRIMMED.sai" "$TRIMMED" > "$OUTPUT_SAM"
+    echo "Generate alignment file (paired ended):"
+    OUTPUT_SAM="$TRIMOM_OUTDIR/${SAMPLE_NAME}.sam"
+    $BWA sampe "$REFERENCE" "$TRIMMED_1.sai" "$TRIMMED_2.sai" "$TRIMMED_1" "$TRIMMED_2" > "$OUTPUT_SAM"
 
     ## Çokoğlu et al 2024 "We filtered out reads of size less than 35 bps, with a mapping quality (MAPQ) of less than 30, and with more than 10% mismatches to the reference genome."
     # 1. Filter by MAPQ

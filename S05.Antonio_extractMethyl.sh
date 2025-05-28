@@ -79,5 +79,11 @@ else
     echo "epiPALEOMIX already ran on the sample"
 fi
 
+## Copy all output in a folder:
+mkdir -p $OUTDIR/ALL_MethylMaps
+find $OUTDIR -path "$OUTDIR/ALL_MethylMaps" -prune -o \ ## prune to exclude the target dir from the search and -o does the following 
+    -type f -name '*_MethylMap_autosomalCpGshg19noSNP.cov4filtered.txt.gz' \
+    -exec cp {} $OUTDIR/ALL_MethylMaps/ \;
+
 echo "Analysis finished!"
 

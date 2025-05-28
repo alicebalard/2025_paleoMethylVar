@@ -1,15 +1,17 @@
 #!/bin/bash
 #$ -N prepAntonio
 #$ -S /bin/bash
-#$ -l h_vmem=4G,tmem=4G ## NB: tmem value is per core
-#$ -l h_vmem=4G
-#$ -t 1-135
+#$ -l h_vmem=12G,tmem=12G ## NB: tmem value is per core
+#$ -t 1-134
 #$ -tc 100 # 100 samples max in one go
 #$ -pe smp 4 # Request N cores per task 
-#$ -l h_rt=240:00:00
+#$ -l h_rt=72:00:00
 #$ -wd /SAN/ghlab/epigen/Alice/paleo_project/logs # one err and out file per sample
 #$ -R y # reserve the resources, i.e. stop smaller jobs from getting into the queue while you wait for all the required resources to become available for you
 THREADS=4
+
+## 28th of May, missing samples:
+#ERR3555039 *
 
 ##########################################
 ## Download hs37d5 reference and index it:
@@ -39,10 +41,8 @@ mkdir -p $TEMP_OUTDIR
 cd $TEMP_OUTDIR
 
 # Create the files to loop over if it does not exist:
-if [ ! -e "$TEMP_OUTDIR/list_of_sample_names.tmp" ]; then
-    ls -1 $SAMPLEDIR/*fastq.gz > $TEMP_OUTDIR/list_of_files.tmp
-    xargs -n1 basename < $TEMP_OUTDIR/list_of_files.tmp | cut -d. -f1 > $TEMP_OUTDIR/list_of_sample_names.tmp
-fi
+ls -1 $SAMPLEDIR/*fastq.gz > $TEMP_OUTDIR/list_of_files.tmp
+xargs -n1 basename < $TEMP_OUTDIR/list_of_files.tmp | cut -d. -f1 > $TEMP_OUTDIR/list_of_sample_names.tmp
 
 ## Select the correct line of list of files at each iteration
 FASTQ=$(sed -n "${SGE_TASK_ID}p" $TEMP_OUTDIR/list_of_files.tmp)
@@ -53,12 +53,13 @@ echo "**** Job $JOB_NAME.$JOB_ID started at $(date) ****"
 echo "Task ID: $SGE_TASK_ID"
 echo "Selected input file: $SAMPLE_NAME"
 
-if [ ! -e "$TEMP_OUTDIR/01Trimmed_data/${SAMPLE_NAME}.filtered.sorted.dedup.bam" ]; then
+TRIMOM_OUTDIR="$TEMP_OUTDIR/01Trimmed_data"
+mkdir -p $TRIMOM_OUTDIR
+
+if [ ! -f "$DATADIR/02samplesBams/Antonio2019/${SAMPLE_NAME}.filtered.sorted.dedup.bam" ]; then
     
     ## Trim raw reads
     ### Single reads: "Raw reads were trimmed using Trim Galore with no quality filter and a length filter of 30 bp (-q0, --length 30, -a ‘AGATCGGAAGAGCACACGTCTGAACTCC’)."
-    TRIMOM_OUTDIR="$TEMP_OUTDIR/01Trimmed_data"
-    mkdir -p $TRIMOM_OUTDIR
 
     TRIMMED="$TRIMOM_OUTDIR/${SAMPLE_NAME}_trimmed.fq.gz"
 
@@ -79,9 +80,6 @@ if [ ! -e "$TEMP_OUTDIR/01Trimmed_data/${SAMPLE_NAME}.filtered.sorted.dedup.bam"
     #done
 
     echo "**** End of step 1: $(date) ****"
-
-    ## output:
-    TRIMMED="$TRIMOM_OUTDIR/${SAMPLE_NAME}_trimmed.fq.gz"
 
     ################################
     # Ancient DNA-optimized Mapping:
@@ -131,8 +129,22 @@ if [ ! -e "$TEMP_OUTDIR/01Trimmed_data/${SAMPLE_NAME}.filtered.sorted.dedup.bam"
 	    VALIDATION_STRINGENCY=LENIENT \
 	    REMOVE_DUPLICATES=TRUE \
 	    M="$TRIMOM_OUTDIR/${SAMPLE_NAME}.filtered.sorted.bam.marked_dup_metrics.txt"
+
+    echo "Move final file in the correct directory:"
+    if [ ! -f "$DATADIR/02samplesBams/Antonio2019/${SAMPLE_NAME}.filtered.sorted.dedup.bam" ]; then
+	mv "$TRIMOM_OUTDIR/${SAMPLE_NAME}.filtered.sorted.dedup.bam" "$DATADIR/02samplesBams/Antonio2019/"
+    fi   
+    echo "Remove the temporary files:"
+    rm "$TRIMOM_OUTDIR/${SAMPLE_NAME}."*
+    rm "$TRIMOM_OUTDIR/${SAMPLE_NAME}_"*
 else
     echo "Sample already processed"
-fi
-    
+    echo "Move final file in the correct directory if needed:"
+    if [ ! -f "$DATADIR/02samplesBams/Antonio2019/${SAMPLE_NAME}.filtered.sorted.dedup.bam" ]; then
+	mv "$TRIMOM_OUTDIR/${SAMPLE_NAME}.filtered.sorted.dedup.bam" "$DATADIR/02samplesBams/Antonio2019/"
+    fi
+    echo "Remove the temporary files:"
+    rm "$TRIMOM_OUTDIR/${SAMPLE_NAME}."*
+    rm "$TRIMOM_OUTDIR/${SAMPLE_NAME}_"*
+fi    
 echo "Analysis done!"
