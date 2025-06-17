@@ -10,9 +10,6 @@
 #$ -R y # reserve the resources, i.e. stop smaller jobs from getting into the queue while you wait for all the required resources to become available for you
 THREADS=4
 
-## 28th of May, missing samples:
-#ERR3555039 *
-
 ##########################################
 ## Download hs37d5 reference and index it:
 

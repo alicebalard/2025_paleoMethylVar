@@ -2,12 +2,13 @@
 #$ -N palprep_paired_Marchi
 #$ -S /bin/bash
 #$ -l h_vmem=12G,tmem=12G ## NB: tmem value is per core
-#$ -t 1-6
 #$ -pe smp 4 # Request N cores per task 
 #$ -l h_rt=24:00:00
 #$ -wd /SAN/ghlab/epigen/Alice/paleo_project/logs # one err and out file per sample
 #$ -R y # reserve the resources, i.e. stop smaller jobs from getting into the queue while you wait for all the required resources to become available for you
 THREADS=4
+
+## last issue: /SAN/ghlab/epigen/Alice/paleo_project/data/01rawfastq/Marchi2022/paired/ERR8684247_1.fastq.gz
 
 ##########################################
 ## Download hs37d5 reference and index it:
@@ -37,12 +38,21 @@ TEMP_OUTDIR="$SAMPLEDIR/TEMP"
 mkdir -p $TEMP_OUTDIR
 cd $TEMP_OUTDIR
 
+## For the last bugging sample:
 # Create the files to loop over if it does not exist:
-ls -1 $SAMPLEDIR/*_1.fastq.gz > $TEMP_OUTDIR/list_of_files.tmp
+ls -1 $SAMPLEDIR/ERR8684247_1.fastq.gz > $TEMP_OUTDIR/list_of_files.tmp
 xargs -n1 basename < $TEMP_OUTDIR/list_of_files.tmp | cut -d. -f1 > $TEMP_OUTDIR/list_of_sample_names.tmp
 
+## For all samples:
+# Create the files to loop over if it does not exist:
+#ls -1 $SAMPLEDIR/*_1.fastq.gz > $TEMP_OUTDIR/list_of_files.tmp
+#xargs -n1 basename < $TEMP_OUTDIR/list_of_files.tmp | cut -d. -f1 > $TEMP_OUTDIR/list_of_sample_names.tmp
+
 ## Select the correct line of list of files at each iteration
-FASTQ_1=$(sed -n "${SGE_TASK_ID}p" $TEMP_OUTDIR/list_of_files.tmp)
+FASTQ_1=$(sed -n "1p" $TEMP_OUTDIR/list_of_files.tmp)
+
+##FASTQ_1=$(sed -n "${SGE_TASK_ID}p" $TEMP_OUTDIR/list_of_files.tmp)
+
 FASTQ_2="${FASTQ_1/_1.fastq.gz/_2.fastq.gz}"
 BASENAME="${FASTQ_1##*/}"         # ERR8702979_1.fastq.gz
 SAMPLE_NAME="${BASENAME%%_*}"     # ERR8702979

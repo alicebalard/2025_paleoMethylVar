@@ -3,17 +3,10 @@
 #$ -S /bin/bash
 #$ -l h_vmem=8G,tmem=8G ## NB: tmem value is per core
 #$ -pe smp 8 # Request N cores per task 
-#$ -t 1-134
+#$ -t 1-15
 #$ -l h_rt=10:00:00
 #$ -wd /SAN/ghlab/epigen/Alice/paleo_project/logs # one err and out file per sample
 #$ -R y # reserve the resources, i.e. stop smaller jobs from getting into the queue while you wait for all the required resources to become available for you
-
-## 30th of May: 4 missing
-#ERR3546001
-#ERR3550219
-#ERR3555037
-#ERR3556095
-
 THREADS=8
 
 # source Python 2.7 to work with epiPALEOMIX
@@ -22,8 +15,8 @@ source /share/apps/source_files/python/python-2.7.16.source
 DATAPROJ="/SAN/ghlab/epigen/Alice/paleo_project/data"
 
 CODEDIR=$DATAPROJ/../code
-BAMDIR="$DATAPROJ/02samplesBams/Antonio2019"
-OUTDIR="$DATAPROJ/04methyl/Antonio2019"
+BAMDIR="$DATAPROJ/02samplesBams/Marchi2022/merged"
+OUTDIR="$DATAPROJ/04methyl/Marchi2022"
 ## the reference BED file for CpG positions:
 BED="$DATAPROJ/03refBed/autosomal_CpGs_hg19_no_dbSNP142.bed"
 ## Harmonise chromosome names to mach the bam files (done, once)
@@ -40,7 +33,7 @@ BED="$DATAPROJ/03refBed/autosomal_CpGs_hg19_no_dbSNP142.bed"
 
 ## 4. The BAM file:
 # Get array of BAM file paths
-bam_files=($BAMDIR/*.filtered.sorted.dedup.bam)
+bam_files=($BAMDIR/*.sorted.bam)
 
 # Get array of sample names (basename without extension)
 sample_names=()

@@ -2,15 +2,20 @@
 #$ -N prepMarchi
 #$ -S /bin/bash
 #$ -l h_vmem=12G,tmem=12G ## NB: tmem value is per core
-#$ -t 1-866
+#$ -t 1-4
 #$ -tc 100 # 100 samples max in one go
 #$ -pe smp 4 # Request N cores per task 
-#$ -l h_rt=72:00:00
+#$ -l h_rt=200:00:00
 #$ -wd /SAN/ghlab/epigen/Alice/paleo_project/logs # one err and out file per sample
 #$ -R y # reserve the resources, i.e. stop smaller jobs from getting into the queue while you wait for all the required resources to become available for you
 THREADS=4
 
-## done: launch Matchi single (866) + double (12) (total=878) --> 862 ok so miss 16
+## 872 samples: DONE
+## pb with:
+#tail: cannot open ‘/SAN/ghlab/epigen/Alice/paleo_project/data/02samplesBams/Marchi2022/damage/output_ERR8657021/5p_freq_misincorporations.txt’ for reading: No such file or directory
+#tail: cannot open ‘/SAN/ghlab/epigen/Alice/paleo_project/data/02samplesBams/Marchi2022/damage/output_ERR8684247/5p_freq_misincorporations.txt’ for reading: No such file or directory
+#tail: cannot open ‘/SAN/ghlab/epigen/Alice/paleo_project/data/02samplesBams/Marchi2022/damage/output_ERR9236172/5p_freq_misincorporations.txt’ for reading: No such file or directory
+#tail: cannot open ‘/SAN/ghlab/epigen/Alice/paleo_project/data/02samplesBams/Marchi2022/damage/output_ERR9236878/5p_freq_misincorporations.txt’ for reading: No such file or directory
 
 ##########################################
 ## Download hs37d5 reference and index it:
@@ -31,7 +36,7 @@ export PATH=/share/apps/pigz-2.6/:$PATH
 
 DATADIR="/SAN/ghlab/epigen/Alice/paleo_project/data"
 SAMPLEDIR="/SAN/ghlab/epigen/Alice/paleo_project/data/01rawfastq/Marchi2022/single"
-REFERENCE="$DATADIR/reference/hs37d5.fa.gz"
+REFERENCE="$DATADIR/reference/hs37d5.fa"
 
 ## We make a temporary folder for all intermediate files that we will delete at the end of all analyses.
 TEMP_OUTDIR="$SAMPLEDIR/TEMP"
@@ -40,8 +45,17 @@ mkdir -p $TEMP_OUTDIR
 cd $TEMP_OUTDIR
 
 # Create the files to loop over if it does not exist (NB: update if paths change!):
-ls -1 $SAMPLEDIR/*fastq.gz > $TEMP_OUTDIR/list_of_files.tmp
+
+## !!!**** just for the 4 missing
+ls -1 $SAMPLEDIR/*ERR8657021*fastq.gz > $TEMP_OUTDIR/list_of_files.tmp
+ls -1 $SAMPLEDIR/*ERR8684247*fastq.gz >> $TEMP_OUTDIR/list_of_files.tmp
+ls -1 $SAMPLEDIR/*ERR9236172*fastq.gz >> $TEMP_OUTDIR/list_of_files.tmp
+ls -1 $SAMPLEDIR/*ERR9236878*fastq.gz >> $TEMP_OUTDIR/list_of_files.tmp
 xargs -n1 basename < $TEMP_OUTDIR/list_of_files.tmp | cut -d. -f1 > $TEMP_OUTDIR/list_of_sample_names.tmp
+
+## FULL one
+## ls -1 $SAMPLEDIR/*fastq.gz > $TEMP_OUTDIR/list_of_files.tmp
+## xargs -n1 basename < $TEMP_OUTDIR/list_of_files.tmp | cut -d. -f1 > $TEMP_OUTDIR/list_of_sample_names.tmp
 
 ## Select the correct line of list of files at each iteration
 FASTQ=$(sed -n "${SGE_TASK_ID}p" $TEMP_OUTDIR/list_of_files.tmp)
