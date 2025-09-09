@@ -39,7 +39,9 @@ bam_files=($BAMDIR/*.bam)
 # Get array of sample names (basename without extension)
 sample_names=()
 for bam in "${bam_files[@]}"; do
-    sample_names+=( "$(basename "$bam" .bam)" )
+    sample_name=$(basename "$bam" .bam)  # Remove .bam extension
+    sample_name=${sample_name%%_*}       # Keep only text before first underscore
+    sample_names+=("$sample_name")
 done
 
 # SGE_TASK_ID is 1-based; Bash arrays are 0-based, so subtract 1

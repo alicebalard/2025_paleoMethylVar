@@ -38,7 +38,7 @@ bam_files=($BAMDIR/*.sorted.bam)
 # Get array of sample names (basename without extension)
 sample_names=()
 for bam in "${bam_files[@]}"; do
-    sample_names+=( "$(basename "$bam" .filtered.sorted.dedup.bam)" )
+    sample_names+=( "$(basename "$bam" .sorted.bam)" )
 done
 
 # SGE_TASK_ID is 1-based; Bash arrays are 0-based, so subtract 1
@@ -60,6 +60,7 @@ echo "SAMPLENAME: $SAMPLENAME"
 ## /share/apps/genomics/bedtools-2.30.0/bin/bedtools coverage -a $BED.harmonised.bed -b $MYBAMPATH | awk '{sum+=$8} END {print sum/NR}'
 
 OUTPUT=$OUTDIR/ALL_MethylMaps/${SAMPLENAME}_MethylMap_autosomalCpGshg19noSNP.cov4filtered.txt.gz
+
 if [ ! -e "$OUTPUT" ]; then
     echo "Make yalm file:"
     YALM0="$CODEDIR/makefile_mytemplate.yaml"

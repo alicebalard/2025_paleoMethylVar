@@ -1,8 +1,8 @@
 #!/bin/bash
 #$ -N paleo_mergeLibs
 #$ -S /bin/bash
-#$ -l tmem=100G
-#$ -l h_vmem=100G
+#$ -l tmem=50G
+#$ -l h_vmem=50G
 #$ -l h_rt=48:00:00
 #$ -wd /SAN/ghlab/epigen/Alice/paleo_project/logs # one err and out file per sample
 #$ -R y # reserve the resources, i.e. stop smaller jobs from getting into the queue while you wait for all the required resources to become available for you
@@ -34,12 +34,12 @@ awk 'NR>1 {print $3}' "$METADATA" | sort | uniq | while read SAMPLE; do
     # Only merge if we have more than zero BAM files
     if [ ${#BAMFILES[@]} -gt 0 ]; then
         echo "Merging ${#BAMFILES[@]} BAMs for sample $SAMPLE..."
-        samtools merge -f "$OUTDIR/${SAMPLE}.bam" "${BAMFILES[@]}"
+        #samtools merge -f "$OUTDIR/${SAMPLE}.bam" "${BAMFILES[@]}"
 
 	## Deduplicate the merged bams
 	echo "Sort and index"
-	samtools sort -o "$OUTDIR/${SAMPLE}.sorted.bam" "$OUTDIR/${SAMPLE}.bam"
-	samtools index "$OUTDIR/${SAMPLE}.sorted.bam"
+	#samtools sort -o "$OUTDIR/${SAMPLE}.sorted.bam" "$OUTDIR/${SAMPLE}.bam"
+	#samtools index "$OUTDIR/${SAMPLE}.sorted.bam"
 
 	echo "Duplicates removal:"
 	java="/share/apps/java/bin/java"
@@ -56,5 +56,3 @@ awk 'NR>1 {print $3}' "$METADATA" | sort | uniq | while read SAMPLE; do
         echo "No BAMs found for sample $SAMPLE, skipping."
     fi
 done
-
-## NB: problem with duplicates: too big!
