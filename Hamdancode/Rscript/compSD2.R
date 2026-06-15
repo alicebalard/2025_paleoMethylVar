@@ -3,9 +3,8 @@ library(purrr)
 library(tidyr)
 library(ggplot2)
 library(scales)
-
-#GET PROGRRESS BAR PACKAGE
-
+library(data.table)
+ 
 #===============================================================================
 # 0. Load CpG sets (top & bottom) and petrous coverage list
 #===============================================================================
@@ -59,10 +58,10 @@ petrous_long <- map_df(names(cov_list_petrous), function(id) {
 }) %>%
   # only CpGs that are in top or bottom 100k, and have depth >= 3
   filter(chrpos %in% cpg_union$chrpos,
-         !is.na(cov), cov >= 2)
+         !is.na(cov), cov >= 3)
 
 #===============================================================================
-# 3. Find CpGs that are present (cov >= 3) in exactly 3 individuals
+# 3. Find CpGs that are present (cov >= 5) in exactly 5 individuals
 #===============================================================================
 
 cpg_counts <- petrous_long %>%
@@ -70,7 +69,7 @@ cpg_counts <- petrous_long %>%
   count(chrpos, name = "n_individuals")
 
 cpg_3 <- cpg_counts %>%
-  filter(n_individuals == 3) %>%    # present in exactly 3 samples
+  filter(n_individuals >= 5) %>%    # present in at least 5 individuals 
   select(chrpos)
 
 #===============================================================================
@@ -331,3 +330,4 @@ p_sd2 <- ggplot() +
   theme_minimal(base_size = 13)
 
 p_sd2
+

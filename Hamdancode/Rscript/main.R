@@ -654,3 +654,270 @@ shared_molar_CpGs <- shared_molar %>%
 head(shared_molar)
 head(shared_molar_CpGs)
 
+ 
+
+
+# DO A CHECK OF CpGs which are vairabile in this group !!
+# redo the plot for the alpha and SD correlation to see if there is thingy 
+
+
+
+
+paper_methylation <- data.frame(
+  sample_id = names(cov_list),
+  n_cpg_sites = sapply(cov_list, function(df) {
+    sum(!is.na(df$V7) & as.numeric(df$V7) > 0)
+  }),
+  total_methylated_reads = sapply(cov_list, function(df) {
+    df$V5 <- as.numeric(df$V5)
+    df$V7 <- as.numeric(df$V7)
+    keep <- !is.na(df$V5) & !is.na(df$V7) & df$V7 > 0
+    sum(df$V5[keep])
+  }),
+  total_reads = sapply(cov_list, function(df) {
+    df$V7 <- as.numeric(df$V7)
+    keep <- !is.na(df$V7) & df$V7 > 0
+    sum(df$V7[keep])
+  }),
+  cpg_methylation_percent = sapply(cov_list, function(df) {
+    df$V5 <- as.numeric(df$V5)
+    df$V7 <- as.numeric(df$V7)
+    keep <- !is.na(df$V5) & !is.na(df$V7) & df$V7 > 0
+    (sum(df$V5[keep]) / sum(df$V7[keep])) * 100
+  }),
+  row.names = NULL
+)
+
+paper_methylation
+
+
+
+
+
+
+suppressPackageStartupMessages({
+  library(data.table)
+  library(ggplot2)
+  library(scales)
+})
+
+# ------------------------------------------------------------
+# 0. Start from pet_annot and keep one row per chr-pos-ID
+# ------------------------------------------------------------
+
+stopifnot(exists("pet_annot"))
+setDT(pet_annot)
+
+trail_from_pet <- pet_annot[
+  !is.na(chr) & !is.na(pos) & !is.na(ID) & !is.na(cov) & !is.na(mthyl),
+  .(
+    cov   = max(as.integer(cov), na.rm = TRUE),
+    mthyl = max(as.integer(mthyl), na.rm = TRUE)
+  ),
+  by = .(
+    chr = as.character(chr),
+    pos = as.integer(pos),
+    ID  = as.character(ID)
+  )
+]
+
+# keep only columns needed for plotting
+trail_from_pet <- trail_from_pet[, .(chr, pos, ID, cov, mthyl)]
+
+# cap coverage at 10 since thresholds are only 1:10
+trail_from_pet[, cov_cap := pmin(cov, 10L)]
+trail_from_pet[, meth_flag := as.integer(mthyl > 0L)]
+
+setkey(trail_from_pet, chr, pos)
+
+# ------------------------------------------------------------
+# 1. Summarise ONCE per CpG site for all thresholds
+# ------------------------------------------------------------
+
+site_counts <- trail_from_pet[
+  ,
+  .(
+    cov_ge_1  = sum(cov_cap >= 1L),
+    cov_ge_2  = sum(cov_cap >= 2L),
+    cov_ge_3  = sum(cov_cap >= 3L),
+    cov_ge_4  = sum(cov_cap >= 4L),
+    cov_ge_5  = sum(cov_cap >= 5L),
+    cov_ge_6  = sum(cov_cap >= 6L),
+    cov_ge_7  = sum(cov_cap >= 7L),
+    cov_ge_8  = sum(cov_cap >= 8L),
+    cov_ge_9  = sum(cov_cap >= 9L),
+    cov_ge_10 = sum(cov_cap >= 10L),
+    
+    meth_ge_1  = sum(meth_flag == 1L & cov_cap >= 1L),
+    meth_ge_2  = sum(meth_flag == 1L & cov_cap >= 2L),
+    meth_ge_3  = sum(meth_flag == 1L & cov_cap >= 3L),
+    meth_ge_4  = sum(meth_flag == 1L & cov_cap >= 4L),
+    meth_ge_5  = sum(meth_flag == 1L & cov_cap >= 5L),
+    meth_ge_6  = sum(meth_flag == 1L & cov_cap >= 6L),
+    meth_ge_7  = sum(meth_flag == 1L & cov_cap >= 7L),
+    meth_ge_8  = sum(meth_flag == 1L & cov_cap >= 8L),
+    meth_ge_9  = sum(meth_flag == 1L & cov_cap >= 9L),
+    meth_ge_10 = sum(meth_flag == 1L & cov_cap >= 10L)
+  ),
+  by = .(chr, pos)
+]
+
+# optional: free memory
+rm(trail_from_pet)
+gc()
+
+# ------------------------------------------------------------
+# 2. Convert per-site counts to cumulative distributions
+# ------------------------------------------------------------
+
+make_cum_dt <- function(v, min_cov, panel_name) {
+  v <- as.integer(v)
+  v <- v[!is.na(v) & v > 0L]
+  
+  if (!length(v)) {
+    return(data.table(
+      n_people = integer(),
+      n_sites_at_least = integer(),
+      min_cov = integer(),
+      label = character(),
+      panel = character()
+    ))
+  }
+  
+  freq <- tabulate(v, nbins = max(v))
+  
+  data.table(
+    n_people = seq_along(freq),
+    n_sites_at_least = rev(cumsum(rev(freq))),
+    min_cov = min_cov,
+    label = paste0("≥", min_cov),
+    panel = panel_name
+  )
+}
+
+dist_all <- rbindlist(lapply(1:10, function(i) {
+  make_cum_dt(site_counts[[paste0("cov_ge_", i)]], i, "All CpGs")
+}))
+
+dist_meth <- rbindlist(lapply(1:10, function(i) {
+  make_cum_dt(site_counts[[paste0("meth_ge_", i)]], i, "Methylated CpGs")
+}))
+
+plot_dat <- rbindlist(list(dist_all, dist_meth))
+plot_dat[, label := factor(label, levels = paste0("≥", 1:10))]
+plot_dat[, panel := factor(panel, levels = c("All CpGs", "Methylated CpGs"))]
+
+# ------------------------------------------------------------
+# 3. Neutral publication-style palette
+# ------------------------------------------------------------
+
+neutral_cols <- c(
+  "≥1"  = "#F2F2F2",
+  "≥2"  = "#E0E0E0",
+  "≥3"  = "#CCCCCC",
+  "≥4"  = "#B8B8B8",
+  "≥5"  = "#A3A3A3",
+  "≥6"  = "#8F8F8F",
+  "≥7"  = "#7A7A7A",
+  "≥8"  = "#666666",
+  "≥9"  = "#525252",
+  "≥10" = "#3D3D3D"
+)
+
+# ------------------------------------------------------------
+# 4. Plot
+# ------------------------------------------------------------
+
+p_shared <- ggplot(
+  plot_dat,
+  aes(x = n_people, y = n_sites_at_least, fill = label)
+) +
+  geom_col(
+    position = "identity",
+    width = 0.9,
+    alpha = 0.9,
+    colour = "black",
+    linewidth = 0.25
+  ) +
+  facet_wrap(~panel, ncol = 2, scales = "fixed") +
+  scale_fill_manual(values = neutral_cols, name = "Min coverage") +
+  scale_y_continuous(
+    trans = "log10",
+    labels = label_number(scale_cut = cut_short_scale()),
+    breaks = 10^(0:7),
+    expand = expansion(mult = c(0.02, 0.06))
+  ) +
+  scale_x_continuous(
+    breaks = pretty_breaks(n = 10),
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  labs(
+    x = "Number of individuals sharing CpG site",
+    y = "Number of CpG sites"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold", size = 11),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.6),
+    axis.title = element_text(face = "bold"),
+    axis.text = element_text(colour = "black"),
+    legend.position = "right",
+    legend.title = element_text(face = "bold"),
+    plot.title = element_blank()
+  )
+
+print(p_shared)
+
+ggsave(
+  "C:/Users/hamda/Desktop/UGI_thingy/shared_cpgs_from_pet_annot_fast.pdf",
+  p_shared,
+  width = 12,
+  height = 5.5,
+  dpi = 600
+)
+
+ggsave(
+  "C:/Users/hamda/Desktop/UGI_thingy/shared_cpgs_from_pet_annot_fast.png",
+  p_shared,
+  width = 12,
+  height = 5.5,
+  dpi = 600
+)
+
+
+
+
+
+
+
+
+library(dplyr)
+
+table1_check <- trail_petrous %>%
+  filter(
+    !is.na(ID),
+    !is.na(chr),
+    !is.na(pos),
+    !is.na(cov),
+    !is.na(mthyl)
+  ) %>%
+  group_by(ID, chr, pos) %>%
+  summarise(
+    cov   = sum(as.numeric(cov),   na.rm = TRUE),
+    mthyl = sum(as.numeric(mthyl), na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  group_by(ID) %>%
+  summarise(
+    number_of_CpGs_retained = n(),
+    total_methylated_reads  = sum(mthyl, na.rm = TRUE),
+    total_reads             = sum(cov, na.rm = TRUE),
+    average_methylation     = 100 * total_methylated_reads / total_reads,
+    .groups = "drop"
+  ) %>%
+  arrange(ID)
+
+table1_check

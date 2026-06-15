@@ -1,5 +1,9 @@
 library(dplyr)
 
+
+
+Mdata <- read.xlsx("C:/Users/hamda/Desktop/UGI_thingy/data/gkac503_supplemental_files/SUPPLEMENTARY_TABLES_resubmission.xlsx", sheet = 6)
+
 # Make sure hg19.pos is numeric
 Mdata$hg19.pos <- as.integer(as.character(Mdata$hg19.pos))
 
@@ -48,9 +52,6 @@ Mdata <- Mdata %>%
   )
 
 head(Mdata[, c("CpG", "chr", "hg19.pos", "chr_hg38", "hg38.pos")])
-
-Mdata$chr_hg38 <- Mdata$chr_hg38.y
-Mdata$hg38.pos <- Mdata$hg38.pos.y
 
 library(dplyr)
 
